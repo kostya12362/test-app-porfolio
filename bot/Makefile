@@ -16,6 +16,9 @@ setup-local:
 start:
 	poetry run python -m main
 
+test:
+	echo "Running tests... #TODO"
+
 lint:
 	poetry run black ./
 	poetry run isort ./

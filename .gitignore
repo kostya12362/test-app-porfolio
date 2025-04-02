@@ -178,3 +178,4 @@ cython_debug/
 .vscode/
 .secrets
 backend/src/staticfiles
+event.json

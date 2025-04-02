@@ -25,12 +25,14 @@ jobs:
       bot_changed: ${{ steps.filter.outputs.bot }}
       instagram_changed: ${{ steps.filter.outputs.instagram }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Detect changed folders
         id: filter
         uses: dorny/paths-filter@v2
         with:
+          base: main  # ✅ important for action and GitHub, shows which branch to compare with
           filters: |
             backend:
               - 'backend/**'

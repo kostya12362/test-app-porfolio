@@ -33,6 +33,9 @@ collect-static:
 create-admin:
 	poetry run python -m manage createsuperuser
 
+test:
+	echo "Running tests... #TODO"
+
 lint:
 	poetry run black ./
 	poetry run isort ./
