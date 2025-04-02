@@ -25,14 +25,13 @@ jobs:
       bot_changed: ${{ steps.filter.outputs.bot }}
       instagram_changed: ${{ steps.filter.outputs.instagram }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Detect changed folders
         id: filter
         uses: dorny/paths-filter@v2
         with:
-          base: main  # ✅ important for action and GitHub, shows which branch to compare with
+          base: main
           filters: |
             backend:
               - 'backend/**'
@@ -41,16 +40,60 @@ jobs:
             instagram:
               - 'workers/instagram/**'
 
-  backend-job:
+  setup-env:
     needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.backend_changed == 'true' ||
+      needs.detect-changes.outputs.bot_changed == 'true' ||
+      needs.detect-changes.outputs.instagram_changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      RABBITMQ_DEFAULT_USER: ${{ secrets.RABBITMQ_DEFAULT_USER }}
+      RABBITMQ_DEFAULT_PASS: ${{ secrets.RABBITMQ_DEFAULT_PASS }}
+      DEBUG: ${{ vars.DEBUG }}  # или secrets.DEBUG
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Docker Compose v2.24.1
+        run: |
+          sudo apt-get update
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.1/docker-compose-$(uname -s)-$(uname -m)" \
+            -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Generate .env file
+        run: |
+          cat <<EOF > .env
+          POSTGRES_USER=${POSTGRES_USER}
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          DEBUG=${DEBUG}
+          EOF
+
+      - name: Start docker-compose
+        run: |
+          docker compose -f docker-compose.local.yml up -d
+          sleep 10
+
+  backend-job:
+    needs: [detect-changes, setup-env]
     if: needs.detect-changes.outputs.backend_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Run backend tests
         run: |
           cd backend
+          make setup-local
           make test
 
       - name: Login to Docker Hub
@@ -58,22 +101,21 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and push backend Docker image
         run: |
           docker build -t $BACKEND_IMAGE:latest ./backend
           docker push $BACKEND_IMAGE:latest
 
   bot-job:
-    needs: detect-changes
+    needs: [detect-changes, setup-env]
     if: needs.detect-changes.outputs.bot_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Run bot tests
         run: |
           cd bot
+          make setup-local
           make test
 
       - name: Login to Docker Hub
@@ -81,22 +123,21 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and push bot Docker image
         run: |
           docker build -t $BOT_IMAGE:latest ./bot
           docker push $BOT_IMAGE:latest
 
   instagram-job:
-    needs: detect-changes
+    needs: [detect-changes, setup-env]
     if: needs.detect-changes.outputs.instagram_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Run Instagram worker tests
         run: |
           cd workers/instagram
+          make setup-local
           make test
 
       - name: Login to Docker Hub
@@ -104,7 +145,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and push Instagram Docker image
         run: |
           docker build -t $INSTAGRAM_IMAGE:latest ./workers/instagram
