@@ -65,30 +65,45 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
           docker-compose --version
 
-
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
       - name: Generate .env file
         run: |
           cat <<EOF > .env
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-          DEBUG=${DEBUG}
+          RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+          RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
           EOF
 
       - name: Start docker-compose
         run: |
-          docker compose -f docker-compose.local.yml up -d
+          docker compose -f docker-compose.local.yml --env-file .env down || true
+          docker compose -f docker-compose.local.yml --env-file .env up -d
           sleep 10
+
+      - name: Check service health
+        uses: jaracogmbh/docker-compose-health-check-action@v1.0.0
+        with:
+          max-retries: 30
+          retry-interval: 10
+          compose-file: "docker-compose.local.yml"
+          skip-exited: "true"
+          skip-no-healthcheck: "true"
 
   backend-job:
     needs: [detect-changes, setup-env]
     if: needs.detect-changes.outputs.backend_changed == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - uses: actions/checkout@v3
       - name: Run backend tests
         run: |
@@ -111,6 +126,16 @@ jobs:
     if: needs.detect-changes.outputs.bot_changed == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - uses: actions/checkout@v3
       - name: Run bot tests
         run: |
@@ -133,6 +158,16 @@ jobs:
     if: needs.detect-changes.outputs.instagram_changed == 'true'
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
       - uses: actions/checkout@v3
       - name: Run Instagram worker tests
         run: |
