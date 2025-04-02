@@ -25,6 +25,6 @@ routers: list[APIRouter] = [
 async def lifespan(application: FastAPI):
     async with broker:
         await broker.start()
-        task = asyncio.create_task(setup_scheduler(cron='* * * * *', callback=push_accounts))
+        task = asyncio.create_task(setup_scheduler(cron='*/2 * * * *', callback=push_accounts))
         yield
         task.cancel()
